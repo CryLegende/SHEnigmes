@@ -134,12 +134,18 @@
 #                   liste vide ou absente : rester dans la zone suffit. Exemple, assis (SHSit) ou accroupi :
 #                     - '%shsit_pose% == sit'
 #                     - '%player_is_sneaking% == yes'
+#    conditions-refus  Conditions annoncées (facultatif, même écriture) : toutes vraies pour que les secondes comptent.
+#                   Un joueur qui tient dans la zone (conditions et tenir vraies) alors que l'une est fausse ne compte
+#                   rien et reçoit actions.refuse, au plus une fois toutes les 15 secondes. Exemple : l'étape d'une quête
+#                   dans conditions (rien n'est dit aux autres joueurs), l'heure dans conditions-refus (« pas le jour »).
 #    actions        Commandes console de chaque événement :
 #                     progres     chaque seconde tenue, sauf la dernière (%secondes% %duree% %restants%)
 #                     interrompu  le joueur a cessé de tenir (sorti de la zone, une condition fausse, plus
 #                                 aucune tenue) : il repart de zéro (%secondes% = secondes perdues)
 #                     reussi      la dernière seconde : la tenue repart de zéro, à relancer si les
 #                                 conditions restent vraies (faites-les changer, par exemple l'étape d'une quête)
+#                     refuse      le joueur tient au bon endroit mais une condition de conditions-refus est
+#                                 fausse (au plus une fois toutes les 15 s)
 #                   Vérifié une fois par seconde, seulement pour les joueurs du monde de la zone. Rien n'est
 #                   enregistré : une déconnexion, un /shenigmes reload ou un redémarrage fait repartir de zéro.
 #

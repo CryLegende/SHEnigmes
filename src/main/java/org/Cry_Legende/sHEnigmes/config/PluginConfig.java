@@ -255,11 +255,12 @@ public final class PluginConfig {
             return null;
         }
         List<Condition> hold = readConditions(id, section, "tenir", warnings);
-        if (hold == null) {
+        List<Condition> refusal = readConditions(id, section, "conditions-refus", warnings);
+        if (hold == null || refusal == null) {
             return null;
         }
         return new PresencePuzzle(id, zone.getString("monde").strip(), zone.getDouble("x"), zone.getDouble("y"),
-            zone.getDouble("z"), radius, seconds, hold, conditions, readActions(id, section, Event.PRESENCE, warnings));
+            zone.getDouble("z"), radius, seconds, hold, refusal, conditions, readActions(id, section, Event.PRESENCE, warnings));
     }
 
     // ------------------------------------------------------------------ communs

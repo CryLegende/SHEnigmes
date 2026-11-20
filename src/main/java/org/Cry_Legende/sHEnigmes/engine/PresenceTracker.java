@@ -27,11 +27,15 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class PresenceTracker {
 
     private static final long ERROR_LOG_INTERVAL_MS = 60_000;
+    /** Un joueur qui tient au bon endroit au mauvais moment est prévenu au plus une fois par cet intervalle. */
+    private static final long REFUSE_INTERVAL_MS = 15_000;
 
     private final SHEnigmes plugin;
     private final ActionRunner actions;
     /** Secondes tenues d'affilée, par joueur puis par énigme ; une entrée n'existe que pendant une tenue. */
     private final Map<UUID, Map<String, Integer>> held = new ConcurrentHashMap<>();
+    /** Dernier refus annoncé, par joueur puis par énigme. */
+    private final Map<UUID, Map<String, Long>> refused = new ConcurrentHashMap<>();
     private final AtomicLong lastError = new AtomicLong();
     private BukkitTask task;
 
@@ -50,6 +54,7 @@ public final class PresenceTracker {
             task = null;
         }
         held.clear();
+        refused.clear();
     }
 
     /**
@@ -57,10 +62,12 @@ public final class PresenceTracker {
      */
     public void clear() {
         held.clear();
+        refused.clear();
     }
 
     public void forget(UUID player) {
         held.remove(player);
+        refused.remove(player);
     }
 
     /**
@@ -107,6 +114,21 @@ public final class PresenceTracker {
             // la zone d'abord : les placeholders ne sont lus que pour les joueurs qui s'y tiennent
             boolean holding = zone.contains(player.getLocation()) && allTrue(player, zone, zone.conditions())
                 && (zone.hold().isEmpty() || anyTrue(player, zone, zone.hold()));
+            if (holding && !allTrue(player, zone, zone.refusal())) {
+                // au bon endroit, mais pas au bon moment (conditions-refus) : rien ne compte, il est prévenu de temps en temps
+                if (before > 0) {
+                    set(id, zone.id(), 0);
+                    actions.run(zone.action(Event.INTERRUPTED), variables(player, zone, before));
+                }
+                long now = System.currentTimeMillis();
+                Map<String, Long> mine = refused.computeIfAbsent(id, k -> new ConcurrentHashMap<>());
+                Long last = mine.get(zone.id());
+                if (last == null || now - last >= REFUSE_INTERVAL_MS) {
+                    mine.put(zone.id(), now);
+                    actions.run(zone.action(Event.REFUSE), variables(player, zone, 0));
+                }
+                continue;
+            }
             if (!holding) {
                 if (before > 0) {
                     set(id, zone.id(), 0);

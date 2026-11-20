@@ -15,9 +15,12 @@ import java.util.Map;
  * @param radius  rayon de la sphère, en blocs
  * @param seconds secondes d'affilée à tenir
  * @param hold    conditions de tenue, au moins une vraie (liste vide : rester dans la zone suffit)
+ * @param refusal conditions annoncées (conditions-refus) : toutes vraies pour compter ; un joueur qui tient au bon endroit
+ *                alors que l'une est fausse reçoit l'action refuse
  */
 public record PresencePuzzle(String id, String world, double x, double y, double z, double radius, int seconds,
-                             List<Condition> hold, List<Condition> conditions, Map<String, List<String>> actions)
+                             List<Condition> hold, List<Condition> refusal, List<Condition> conditions,
+                             Map<String, List<String>> actions)
     implements Puzzle {
 
     @Override

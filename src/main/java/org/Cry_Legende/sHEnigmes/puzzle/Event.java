@@ -20,7 +20,7 @@ public final class Event {
     public static final List<String> SEQUENCE = List.of(GOOD, WRONG, SOLVED, ALREADY, REFUSE);
     public static final List<String> WORD = List.of(SHOW, SOLVED, WRONG, ALREADY, REFUSE);
     public static final List<String> COLLECTION = List.of(FOUND, SOLVED, ALREADY, REFUSE);
-    public static final List<String> PRESENCE = List.of(PROGRESS, INTERRUPTED, SOLVED);
+    public static final List<String> PRESENCE = List.of(PROGRESS, INTERRUPTED, SOLVED, REFUSE);
 
     private Event() {
     }
