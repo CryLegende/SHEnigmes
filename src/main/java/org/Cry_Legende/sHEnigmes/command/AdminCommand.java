@@ -3,6 +3,7 @@ package org.Cry_Legende.sHEnigmes.command;
 import org.Cry_Legende.sHEnigmes.SHEnigmes;
 import org.Cry_Legende.sHEnigmes.config.Messages;
 import org.Cry_Legende.sHEnigmes.engine.PuzzleEngine;
+import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.SequencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.WordPuzzle;
@@ -20,12 +21,12 @@ import java.util.Locale;
 import java.util.stream.IntStream;
 
 /**
- * /shenigmes saisir|jouer|montrer|repondre|reset|etat|reload
+ * /shenigmes saisir|jouer|montrer|repondre|trouver|reset|etat|reload
  */
 public final class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUB_COMMANDS =
-        List.of("saisir", "jouer", "montrer", "repondre", "reset", "etat", "reload");
+        List.of("saisir", "jouer", "montrer", "repondre", "trouver", "reset", "etat", "reload");
 
     private static final String ADMIN_PERMISSION = "shenigmes.admin";
 
@@ -106,6 +107,13 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
                     engine.answer(sender, args[1], args[2], text);
                 }
             }
+            case "trouver" -> {
+                if (args.length != 4) {
+                    messages.send(sender, "admin.usage-trouver");
+                } else {
+                    engine.find(sender, args[1], args[2], args[3]);
+                }
+            }
             case "reset" -> {
                 if (args.length != 3) {
                     messages.send(sender, "admin.usage-reset");
@@ -157,6 +165,7 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
                 boolean fits = switch (sub) {
                     case "saisir", "jouer" -> puzzle instanceof SequencePuzzle;
                     case "montrer", "repondre" -> puzzle instanceof WordPuzzle;
+                    case "trouver" -> puzzle instanceof CollectionPuzzle;
                     default -> true;
                 };
                 if (fits && puzzle.id().startsWith(prefix)) {
@@ -173,6 +182,7 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
             int count = switch (sub) {
                 case "saisir" -> puzzle instanceof SequencePuzzle sequence ? sequence.symbols() : 0;
                 case "montrer" -> puzzle instanceof WordPuzzle word ? word.pieces() : 0;
+                case "trouver" -> puzzle instanceof CollectionPuzzle collection ? collection.pieces() : 0;
                 default -> 0;
             };
             return IntStream.rangeClosed(1, count).mapToObj(String::valueOf)

@@ -1,6 +1,7 @@
 package org.Cry_Legende.sHEnigmes.config;
 
 import org.Cry_Legende.sHEnigmes.SHEnigmes;
+import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Condition;
 import org.Cry_Legende.sHEnigmes.puzzle.Event;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
@@ -88,8 +89,9 @@ public final class PluginConfig {
         return switch (type) {
             case "sequence" -> readSequence(id, section, conditions, warnings, prefix);
             case "mot" -> readWord(id, section, conditions, warnings, prefix);
+            case "collecte" -> readCollection(id, section, conditions, warnings, prefix);
             default -> {
-                warnings.add(prefix + "'type' vaut '" + section.getString("type") + "' (sequence ou mot)");
+                warnings.add(prefix + "'type' vaut '" + section.getString("type") + "' (sequence, mot ou collecte)");
                 yield null;
             }
         };
@@ -213,6 +215,18 @@ public final class PluginConfig {
         }
         return new WordPuzzle(id, List.copyOf(words), pieces, conditions,
             readActions(id, section, Event.WORD, warnings));
+    }
+
+    // ------------------------------------------------------------------ collecte
+
+    private static Puzzle readCollection(String id, ConfigurationSection section, List<Condition> conditions,
+                                         List<String> warnings, String prefix) {
+        int pieces = section.getInt("pieces");
+        if (pieces < 1 || pieces > MAX_LENGTH) {
+            warnings.add(prefix + "'pieces' doit être un entier entre 1 et " + MAX_LENGTH);
+            return null;
+        }
+        return new CollectionPuzzle(id, pieces, conditions, readActions(id, section, Event.COLLECTION, warnings));
     }
 
     // ------------------------------------------------------------------ communs

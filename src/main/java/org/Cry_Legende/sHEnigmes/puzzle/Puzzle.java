@@ -4,14 +4,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Une énigme de config.yml : un code secret propre à chaque joueur, soit une séquence de symboles, soit un mot.
+ * Une énigme de config.yml : un code secret propre à chaque joueur, soit une séquence de symboles, soit un mot, ou
+ * une collecte de pièces numérotées à trouver (sans code).
  */
-public sealed interface Puzzle permits SequencePuzzle, WordPuzzle {
+public sealed interface Puzzle permits SequencePuzzle, WordPuzzle, CollectionPuzzle {
 
     String id();
 
     /**
-     * Commandes console par événement (bon, faux, reussi, deja, montrer, refuse).
+     * Commandes console par événement (bon, faux, reussi, deja, montrer, trouve, refuse).
      */
     Map<String, List<String>> actions();
 
@@ -21,7 +22,7 @@ public sealed interface Puzzle permits SequencePuzzle, WordPuzzle {
     List<Condition> conditions();
 
     /**
-     * Nombre d'éléments du code (symboles d'une séquence, lettres d'un mot).
+     * Nombre d'éléments du code (symboles d'une séquence, lettres d'un mot, pièces d'une collecte).
      */
     int length();
 

@@ -13,8 +13,8 @@ import java.util.regex.Pattern;
 /**
  * Lance les commandes d'une action en console, dans l'ordre, sur le thread principal (Bukkit refuse toute commande
  * lancée depuis un autre thread : l'appelant est souvent le scheduler d'un joueur, et DivineMC fait tourner les
- * mondes en parallèle). Les variables %player%, %id%, %symbole%, %rang%, %longueur%, %lettre% et %nom% sont
- * remplacées ; un autre %...% reste tel quel.
+ * mondes en parallèle). Les variables %player%, %id%, %symbole%, %rang%, %longueur%, %lettre%, %nom%, %trouves%,
+ * %pieces% et %restants% sont remplacées ; un autre %...% reste tel quel.
  */
 public final class ActionRunner {
 

@@ -3,6 +3,7 @@ package org.Cry_Legende.sHEnigmes.hook;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.Cry_Legende.sHEnigmes.SHEnigmes;
 import org.Cry_Legende.sHEnigmes.data.PuzzleState;
+import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.SequencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.WordPuzzle;
@@ -11,13 +12,14 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
+import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 /**
  * %shenigmes_&lt;id&gt;_&lt;valeur&gt;% : le code d'un joueur et son avancement. Lire un placeholder tire le code du
- * joueur s'il n'existe pas encore. Un identifiant inconnu, une valeur qui ne s'applique pas à ce type d'énigme ou un
+ * joueur s'il n'existe pas encore (une collecte n'a pas de code : la lire n'enregistre rien). Un identifiant inconnu, une valeur qui ne s'applique pas à ce type d'énigme ou un
  * joueur hors ligne donnent une chaîne vide.
  */
 public final class EnigmesExpansion extends PlaceholderExpansion {
@@ -84,16 +86,22 @@ public final class EnigmesExpansion extends PlaceholderExpansion {
             return String.valueOf(puzzle.length());
         }
         if (what.equals("pieces")) {
-            return puzzle instanceof WordPuzzle word ? String.valueOf(word.pieces()) : "";
+            return switch (puzzle) {
+                case WordPuzzle word -> String.valueOf(word.pieces());
+                case CollectionPuzzle collection -> String.valueOf(collection.pieces());
+                default -> "";
+            };
         }
 
         Player player = offline == null ? null : offline.getPlayer();
         if (player == null) {
             return "";
         }
-        PuzzleState state = plugin.store().state(player, puzzle);
         SequencePuzzle sequence = puzzle instanceof SequencePuzzle s ? s : null;
         WordPuzzle word = puzzle instanceof WordPuzzle w ? w : null;
+        CollectionPuzzle collection = puzzle instanceof CollectionPuzzle c ? c : null;
+        PuzzleState state = collection == null ? plugin.store().state(player, puzzle)
+            : Objects.requireNonNullElseGet(plugin.store().peek(player, puzzle), PuzzleState::new);
 
         switch (what) {
             case "resolue" -> {
@@ -109,6 +117,13 @@ public final class EnigmesExpansion extends PlaceholderExpansion {
             case "vues" -> {
                 return word == null ? "" : String.valueOf(state.seenCount());
             }
+            case "trouves" -> {
+                return collection == null ? "" : String.valueOf(state.seenCount(collection.pieces()));
+            }
+            case "restants" -> {
+                return collection == null ? ""
+                    : String.valueOf(collection.pieces() - state.seenCount(collection.pieces()));
+            }
             case "noms" -> {
                 if (sequence == null) {
                     return "";
@@ -123,7 +138,7 @@ public final class EnigmesExpansion extends PlaceholderExpansion {
             }
         }
 
-        // valeurs indexées : code_<i>, nom_<i>, lettre_<i>, vue_<i>
+        // valeurs indexées : code_<i>, nom_<i>, lettre_<i>, vue_<i>, trouve_<i>
         int underscore = what.indexOf('_');
         if (underscore < 0) {
             return "";
@@ -142,6 +157,7 @@ public final class EnigmesExpansion extends PlaceholderExpansion {
             case "nom" -> sequence != null ? sequence.nameOf(state.symbolAt(rank)) : "";
             case "lettre" -> word != null ? state.letterAt(rank) : "";
             case "vue" -> word != null ? String.valueOf(state.isSeen(rank)) : "";
+            case "trouve" -> collection != null ? String.valueOf(state.isSeen(rank)) : "";
             default -> "";
         };
     }

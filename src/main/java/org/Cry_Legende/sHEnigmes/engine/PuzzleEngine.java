@@ -6,6 +6,7 @@ import org.Cry_Legende.sHEnigmes.config.Messages;
 import org.Cry_Legende.sHEnigmes.config.PluginConfig;
 import org.Cry_Legende.sHEnigmes.data.PlayerStore;
 import org.Cry_Legende.sHEnigmes.data.PuzzleState;
+import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Condition;
 import org.Cry_Legende.sHEnigmes.puzzle.Event;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
@@ -26,7 +27,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Les opérations des sous-commandes : saisir, jouer, montrer, repondre, reset et etat. Chacune vérifie ses arguments
+ * Les opérations des sous-commandes : saisir, jouer, montrer, repondre, trouver, reset et etat. Chacune vérifie ses arguments
  * sur le thread de la commande, puis travaille sur le scheduler du joueur (PDC, état) et envoie les commandes de
  * l'action au thread principal.
  */
@@ -100,6 +101,18 @@ public final class PuzzleEngine {
             return word;
         }
         messages().send(sender, "erreur.pas-un-mot", "{ID}", puzzle.id());
+        return null;
+    }
+
+    private CollectionPuzzle collection(CommandSender sender, String id) {
+        Puzzle puzzle = puzzle(sender, id);
+        if (puzzle == null) {
+            return null;
+        }
+        if (puzzle instanceof CollectionPuzzle collection) {
+            return collection;
+        }
+        messages().send(sender, "erreur.pas-une-collecte", "{ID}", puzzle.id());
         return null;
     }
 
@@ -297,6 +310,59 @@ public final class PuzzleEngine {
         });
     }
 
+    // ------------------------------------------------------------------ collecte
+
+    /**
+     * /shenigmes trouver : une pièce trouvée par le joueur. La dernière pièce résout l'énigme, et l'action reussi
+     * suit l'action trouve dans le même bloc de commandes.
+     */
+    public void find(CommandSender sender, String playerName, String id, String rankText) {
+        Player player = player(sender, playerName);
+        CollectionPuzzle puzzle = player == null ? null : collection(sender, id);
+        if (puzzle == null) {
+            return;
+        }
+        int rank;
+        try {
+            rank = Integer.parseInt(rankText.strip());
+        } catch (NumberFormatException e) {
+            rank = 0;
+        }
+        if (rank < 1 || rank > puzzle.pieces()) {
+            messages().send(sender, "erreur.rang-invalide", "{ARG}", rankText, "{MAX}", String.valueOf(puzzle.pieces()));
+            return;
+        }
+        int found = rank;
+        onPlayer(sender, player, () -> {
+            if (refused(player, puzzle)) {
+                return;
+            }
+            PuzzleState state = store.state(player, puzzle);
+            Map<String, String> variables = variables(player, puzzle);
+            variables.put("rang", String.valueOf(found));
+            List<String> commands;
+            synchronized (state) {
+                if (state.isSeen(found)) {
+                    commands = puzzle.action(Event.ALREADY);
+                } else {
+                    state.markSeen(found);
+                    commands = puzzle.action(Event.FOUND);
+                    if (state.seenCount(puzzle.pieces()) >= puzzle.pieces()) {
+                        state.solve();
+                        commands = new ArrayList<>(commands);
+                        commands.addAll(puzzle.action(Event.SOLVED));
+                    }
+                }
+                int count = state.seenCount(puzzle.pieces());
+                variables.put("trouves", String.valueOf(count));
+                variables.put("pieces", String.valueOf(puzzle.pieces()));
+                variables.put("restants", String.valueOf(puzzle.pieces() - count));
+            }
+            store.save(player, puzzle.id());
+            actions.run(commands, variables);
+        });
+    }
+
     // ------------------------------------------------------------------ remise à zéro et état
 
     /**
@@ -325,6 +391,8 @@ public final class PuzzleEngine {
                     "{AMOUNT}", String.valueOf(cleared.size()));
             } else if (cleared.isEmpty()) {
                 messages().send(sender, "admin.reset-rien", "{PLAYER}", player.getName(), "{ID}", id);
+            } else if (plugin.config().puzzle(id) instanceof CollectionPuzzle) {
+                messages().send(sender, "admin.reset-collecte", "{PLAYER}", player.getName(), "{ID}", id);
             } else {
                 messages().send(sender, "admin.reset", "{PLAYER}", player.getName(), "{ID}", id);
             }
@@ -332,7 +400,7 @@ public final class PuzzleEngine {
     }
 
     /**
-     * /shenigmes etat : code, saisie, pièces vues et résolue, sans rien tirer.
+     * /shenigmes etat : code, saisie, pièces vues ou trouvées et résolue, sans rien tirer.
      */
     public void status(CommandSender sender, String playerName, String id) {
         Player player = player(sender, playerName);
@@ -357,6 +425,18 @@ public final class PuzzleEngine {
             messages().send(sender, "admin.etat-entete", "{PLAYER}", player.getName());
             for (Puzzle puzzle : selected) {
                 PuzzleState state = store.peek(player, puzzle);
+                if (puzzle instanceof CollectionPuzzle collection) {
+                    // pas de code à tirer : une collecte jamais commencée s'affiche à zéro
+                    PuzzleState current = state == null ? new PuzzleState() : state;
+                    String found = current.seenRanks(collection.pieces()).stream().map(String::valueOf)
+                        .collect(Collectors.joining(", "));
+                    messages().send(sender, "admin.etat-collecte", "{ID}", puzzle.id(),
+                        "{TROUVEES}", found.isEmpty() ? messages().get("admin.etat-aucune") : found,
+                        "{AMOUNT}", String.valueOf(current.seenCount(collection.pieces())),
+                        "{MAX}", String.valueOf(collection.pieces()),
+                        "{RESOLUE}", messages().get(current.solved() ? "admin.etat-oui" : "admin.etat-non"));
+                    continue;
+                }
                 if (state == null) {
                     messages().send(sender, "admin.etat-vide", "{ID}", puzzle.id());
                     continue;

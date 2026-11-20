@@ -3,14 +3,14 @@ version: '${project.version}'
 main: org.Cry_Legende.sHEnigmes.SHEnigmes
 api-version: '1.21'
 author: Cry_Legende
-description: Codes secrets propres à chaque joueur (séquences et mots) pour les énigmes, pilotés depuis la console.
+description: Codes secrets propres à chaque joueur (séquences et mots) et collectes de pièces pour les énigmes, pilotés depuis la console.
 softdepend:
   - PlaceholderAPI
 
 commands:
   shenigmes:
     description: Commandes d'administration des énigmes (codes secrets par joueur).
-    usage: /shenigmes <saisir|jouer|montrer|repondre|reset|etat|reload>
+    usage: /shenigmes <saisir|jouer|montrer|repondre|trouver|reset|etat|reload>
     aliases:
       - enigmes
 
@@ -23,6 +23,7 @@ permissions:
       shenigmes.admin.jouer: true
       shenigmes.admin.montrer: true
       shenigmes.admin.repondre: true
+      shenigmes.admin.trouver: true
       shenigmes.admin.reset: true
       shenigmes.admin.etat: true
       shenigmes.admin.reload: true
@@ -38,11 +39,14 @@ permissions:
   shenigmes.admin.repondre:
     description: Proposer un mot pour un joueur (/shenigmes repondre).
     default: op
+  shenigmes.admin.trouver:
+    description: Marquer une pièce d'une collecte comme trouvée par un joueur (/shenigmes trouver).
+    default: op
   shenigmes.admin.reset:
     description: Effacer le code d'un joueur pour tirer un nouveau code (/shenigmes reset).
     default: op
   shenigmes.admin.etat:
-    description: Afficher le code, la saisie et les pièces vues d'un joueur (/shenigmes etat).
+    description: Afficher le code, la saisie et les pièces vues ou trouvées d'un joueur (/shenigmes etat).
     default: op
   shenigmes.admin.reload:
     description: Recharger config.yml et messages.yml (/shenigmes reload).

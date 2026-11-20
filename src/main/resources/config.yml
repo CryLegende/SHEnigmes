@@ -7,16 +7,18 @@
 #
 # Donne à chaque joueur son propre code secret pour une énigme : une séquence
 # de symboles (lanternes à allumer dans l'ordre, mélodie à rejouer) ou un mot
-# (lettres cachées dans des livres, mot à retrouver). Le plugin ne connaît
-# aucun autre plugin : tout est lancé depuis la console par des commandes, et
-# tout ce qui se passe en retour est une liste de commandes console écrite ici
-# ou un placeholder PlaceholderAPI.
+# (lettres cachées dans des livres, mot à retrouver). Une collecte n'a pas de
+# code : ce sont des pièces numérotées à trouver, une fois chacune (abeilles
+# perdues cachées dans le monde). Le plugin ne connaît aucun autre plugin :
+# tout est lancé depuis la console par des commandes, et tout ce qui se passe
+# en retour est une liste de commandes console écrite ici ou un placeholder
+# PlaceholderAPI.
 #
 # Le code est tiré au hasard (SecureRandom) la première fois qu'on en a besoin,
 # puis gardé pour toujours dans les données du joueur (PersistentDataContainer,
 # clé shenigmes:<identifiant>) jusqu'à un /shenigmes reset. Il survit aux
-# redémarrages et aux reconnexions. La saisie en cours, les pièces vues et
-# l'état résolu sont gardés au même endroit.
+# redémarrages et aux reconnexions. La saisie en cours, les pièces vues ou
+# trouvées et l'état résolu sont gardés au même endroit.
 #
 # ---------------------------------------------------------------------
 #  COMMANDES  (aussi depuis la console, alias /enigmes)
@@ -25,8 +27,11 @@
 #  /shenigmes jouer <joueur> <id>                 Séquence : rejoue le code au joueur (section jouer)
 #  /shenigmes montrer <joueur> <id> <rang>        Mot : lance 'montrer' et marque la pièce comme vue
 #  /shenigmes repondre <joueur> <id> <texte...>   Mot : compare sans casse, sans accents, sans espaces
-#  /shenigmes reset <joueur> <id|*>               Efface le code (un nouveau est tiré au prochain besoin)
-#  /shenigmes etat <joueur> [id]                  Code, saisie, pièces vues et résolue (ne tire rien)
+#  /shenigmes trouver <joueur> <id> <rang>        Collecte : le joueur trouve la pièce de ce rang (1 à pieces)
+#  /shenigmes reset <joueur> <id|*>               Efface le code ou les pièces trouvées (un nouveau code
+#                                                 est tiré au prochain besoin, une collecte repart de zéro)
+#  /shenigmes etat <joueur> [id]                  Code, saisie, pièces vues ou trouvées et résolue (ne tire
+#                                                 rien)
 #  /shenigmes reload                              Recharge config.yml et messages.yml (un fichier
 #                                                 illisible ne change rien et est nommé ; aucun réglage
 #                                                 ne demande un redémarrage ; les codes des joueurs
@@ -42,6 +47,7 @@
 #  shenigmes.admin.jouer       jouer
 #  shenigmes.admin.montrer     montrer
 #  shenigmes.admin.repondre    repondre
+#  shenigmes.admin.trouver     trouver
 #  shenigmes.admin.reset       reset
 #  shenigmes.admin.etat        etat
 #  shenigmes.admin.reload      reload
@@ -49,9 +55,9 @@
 # ---------------------------------------------------------------------
 #  ÉNIGMES  (section 'enigmes', un bloc par identifiant : a-z 0-9 _ -)
 # ---------------------------------------------------------------------
-#  Commun aux deux types
-#    conditions     Liste de conditions (facultatif), toutes vraies pour que saisir, jouer, montrer et
-#                   repondre agissent. Une condition s'écrit "A opérateur B", avec des espaces autour de
+#  Commun aux trois types
+#    conditions     Liste de conditions (facultatif), toutes vraies pour que saisir, jouer, montrer,
+#                   repondre et trouver agissent. Une condition s'écrit "A opérateur B", avec des espaces autour de
 #                   l'opérateur : == != >= <= > < contient !contient. A et B passent par PlaceholderAPI
 #                   pour le joueur (s'il est installé) avant la comparaison :
 #                     - si A et B se lisent comme des nombres, la comparaison est numérique : espaces et
@@ -64,7 +70,7 @@
 #                   Exemples : '%player_name% == Steve', '%player_level% >= 5',
 #                   '%shenigmes_autre_resolue% == true', '%player_name% !contient bot'.
 #                   Une condition fausse n'enregistre rien (aucun code tiré, aucune saisie, aucune pièce
-#                   vue) et lance seulement actions.refuse. Les placeholders et les sous-commandes reset et
+#                   vue ou trouvée) et lance seulement actions.refuse. Les placeholders et les sous-commandes reset et
 #                   etat ne tiennent pas compte des conditions. Une condition illisible fait ignorer
 #                   l'énigme, signalée au chargement.
 #
@@ -106,29 +112,47 @@
 #                     refuse   une condition est fausse (valable pour montrer et repondre ; variables
 #                              %player% et %id%)
 #
+#  Collecte (type: collecte)
+#    pieces         Nombre de pièces, numérotées de 1 à pieces. Chaque pièce se trouve une fois par joueur
+#                   (/shenigmes trouver), dans n'importe quel ordre ; le plugin ne sait pas où elles sont.
+#    actions        Commandes console de chaque événement :
+#                     trouve   une nouvelle pièce est trouvée (%rang% %trouves% %pieces% %restants%)
+#                     reussi   la dernière pièce : l'énigme est résolue, lancé juste après trouve
+#                     deja     cette pièce était déjà trouvée (mêmes variables)
+#                     refuse   une condition est fausse (valable pour trouver ; variables %player% et %id%)
+#                   Une pièce déjà trouvée ne lance que deja ; une pièce nouvelle lance trouve, puis
+#                   reussi si elle est la dernière. Une collecte n'a pas de code : la lire par placeholder
+#                   n'enregistre rien. Changer pieces ne fait rien perdre (seuls les rangs de 1 à pieces
+#                   comptent).
+#
 #  Les commandes d'une action sont lancées en console, sur le thread principal, dans l'ordre. Un
 #  / de tête est accepté. Variables remplacées :
 #    %player%    pseudo du joueur             %id%       identifiant de l'énigme
 #    %symbole%   numéro de l'entrée           %rang%     place de l'entrée dans le code, ou de la pièce
 #    %longueur%  longueur du code ou pieces   %lettre%   lettre de la pièce montrée
-#    %nom%       nom du symbole
+#    %nom%       nom du symbole               %trouves%  pièces trouvées (collecte), celle-ci comprise
+#    %pieces%    nombre de pièces (collecte)  %restants% pièces qui restent à trouver (collecte)
 #  Le texte d'une réponse n'est jamais inséré dans une commande.
 #
 # ---------------------------------------------------------------------
 #  PLACEHOLDERS  (PlaceholderAPI, %shenigmes_<id>_...%)
 # ---------------------------------------------------------------------
 #  resolue      true ou false
-#  code         3-1-4-5-2 pour une séquence, le mot pour un mot
-#  code_<i>     le symbole, ou la lettre, de rang i
+#  code         3-1-4-5-2 pour une séquence, le mot pour un mot (séquence, mot)
+#  code_<i>     le symbole, ou la lettre, de rang i (séquence, mot)
 #  noms         Les noms des symboles du code, séparés par 'separateur' (séquence)
 #  nom_<i>      Le nom du symbole de rang i du code (séquence)
 #  saisie       Nombre d'entrées en cours (séquence)
 #  vues         Nombre de pièces vues (mot)
 #  vue_<i>      true si la pièce de rang i a été vue (mot)
-#  pieces       Nombre de pièces (mot)
+#  pieces       Nombre de pièces (mot, collecte)
 #  lettre_<i>   La lettre de rang i (mot)
-#  longueur     Longueur du code
-#  Lire un placeholder tire le code du joueur s'il n'existe pas encore. Un identifiant inconnu, une
+#  trouves      Nombre de pièces trouvées (collecte)
+#  trouve_<i>   true si la pièce de rang i a été trouvée (collecte)
+#  restants     Nombre de pièces qui restent à trouver (collecte)
+#  longueur     Longueur du code, ou nombre de pièces
+#  Lire un placeholder tire le code du joueur s'il n'existe pas encore (une collecte n'a pas de code, la
+#  lire n'enregistre rien). Un identifiant inconnu, une
 #  valeur qui ne s'applique pas au type de l'énigme ou un joueur hors ligne donnent un texte vide.
 # ---------------------------------------------------------------------
 
@@ -194,3 +218,17 @@ enigmes:
         - 'tellraw %player% {"text":"Ce n''est pas le bon mot.","color":"red"}'
       deja:
         - 'tellraw %player% {"text":"Tu as déjà trouvé ce mot.","color":"gray"}'
+
+  # Cinq pièces à trouver, dans n'importe quel ordre, une fois chacune.
+  collecte-exemple:
+    type: collecte
+    pieces: 5
+    actions:
+      trouve:
+        - 'execute at %player% run playsound minecraft:entity.experience_orb.pickup master %player% ~ ~ ~ 1 1.2'
+        - 'tellraw %player% {"text":"Pièce %rang% trouvée : %trouves% sur %pieces%, il en reste %restants%.","color":"yellow"}'
+      reussi:
+        - 'execute at %player% run playsound minecraft:entity.player.levelup master %player% ~ ~ ~ 1 1'
+        - 'say %player% a trouvé toutes les pièces de %id%'
+      deja:
+        - 'tellraw %player% {"text":"Tu as déjà trouvé la pièce %rang%.","color":"gray"}'

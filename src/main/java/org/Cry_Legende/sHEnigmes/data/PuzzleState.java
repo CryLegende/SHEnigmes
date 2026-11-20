@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.SequencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.WordPuzzle;
@@ -14,14 +15,15 @@ import java.util.BitSet;
 import java.util.List;
 
 /**
- * État d'un joueur pour une énigme : code, saisie en cours, pièces vues, résolue. Enregistré en JSON compact dans le
- * PersistentDataContainer du joueur. Chaque méthode est synchronisée, un placeholder peut le lire depuis n'importe
+ * État d'un joueur pour une énigme : code, saisie en cours, pièces vues (ou trouvées, pour une collecte), résolue.
+ * Enregistré en JSON compact dans le PersistentDataContainer du joueur. Chaque méthode est synchronisée, un placeholder peut le lire depuis n'importe
  * quel thread ; une suite d'appels qui doit rester cohérente se fait dans un bloc synchronized sur l'état.
  */
 public final class PuzzleState {
 
     private int[] code;
     private String word;
+    private boolean collection;
     private final List<Integer> input = new ArrayList<>();
     private final BitSet seen = new BitSet();
     private boolean solved;
@@ -30,8 +32,11 @@ public final class PuzzleState {
 
     // ------------------------------------------------------------------ code
 
+    /**
+     * Vrai si l'état est initialisé : un code tiré, ou une collecte commencée (une collecte n'a pas de code).
+     */
     public synchronized boolean hasCode() {
-        return code != null || word != null;
+        return code != null || word != null || collection;
     }
 
     /**
@@ -55,6 +60,10 @@ public final class PuzzleState {
             case WordPuzzle wordPuzzle -> {
                 return word != null && word.codePointCount(0, word.length()) == wordPuzzle.pieces();
             }
+            case CollectionPuzzle ignored -> {
+                // un changement de pieces ne fait rien perdre : seuls les rangs de 1 à pieces comptent
+                return collection;
+            }
         }
     }
 
@@ -64,6 +73,7 @@ public final class PuzzleState {
     public synchronized void clear() {
         code = null;
         word = null;
+        collection = false;
         input.clear();
         seen.clear();
         solved = false;
@@ -72,7 +82,8 @@ public final class PuzzleState {
     }
 
     /**
-     * Tire un nouveau code (l'état est d'abord remis à zéro).
+     * Tire un nouveau code (l'état est d'abord remis à zéro). Une collecte n'a pas de code : l'état est seulement
+     * initialisé.
      */
     public synchronized void draw(Puzzle puzzle, SecureRandom random) {
         clear();
@@ -100,6 +111,7 @@ public final class PuzzleState {
                 code = drawn;
             }
             case WordPuzzle wordPuzzle -> word = wordPuzzle.words().get(random.nextInt(wordPuzzle.words().size()));
+            case CollectionPuzzle ignored -> collection = true;
         }
     }
 
@@ -193,9 +205,23 @@ public final class PuzzleState {
         return seen.cardinality();
     }
 
+    /**
+     * Nombre de pièces vues parmi les rangs 1 à max (les rangs au-delà, d'une ancienne config, ne comptent pas).
+     */
+    public synchronized int seenCount(int max) {
+        return seen.get(1, max + 1).cardinality();
+    }
+
     public synchronized List<Integer> seenRanks() {
+        return seenRanks(Integer.MAX_VALUE - 1);
+    }
+
+    /**
+     * Rangs des pièces vues de 1 à max.
+     */
+    public synchronized List<Integer> seenRanks(int max) {
         List<Integer> ranks = new ArrayList<>();
-        for (int i = seen.nextSetBit(0); i >= 0; i = seen.nextSetBit(i + 1)) {
+        for (int i = seen.nextSetBit(0); i >= 0 && i <= max; i = seen.nextSetBit(i + 1)) {
             ranks.add(i);
         }
         return ranks;
@@ -223,7 +249,8 @@ public final class PuzzleState {
     }
 
     /**
-     * JSON compact : c code (tableau ou mot), i saisie, t heure de la dernière entrée, v pièces vues, s résolue.
+     * JSON compact : c code (tableau ou mot), k collecte, i saisie, t heure de la dernière entrée, v pièces vues (ou
+     * trouvées), s résolue.
      */
     public synchronized String toJson() {
         JsonObject json = new JsonObject();
@@ -235,6 +262,8 @@ public final class PuzzleState {
             json.add("c", array);
         } else if (word != null) {
             json.addProperty("c", word);
+        } else if (collection) {
+            json.addProperty("k", 1);
         }
         if (!input.isEmpty()) {
             JsonArray array = new JsonArray();
@@ -271,6 +300,8 @@ public final class PuzzleState {
             } else if (c != null && c.isJsonPrimitive()) {
                 state.word = c.getAsString();
             }
+            JsonElement k = json.get("k");
+            state.collection = k != null && k.getAsInt() == 1;
             JsonElement i = json.get("i");
             if (i != null && i.isJsonArray()) {
                 i.getAsJsonArray().forEach(element -> state.input.add(element.getAsInt()));

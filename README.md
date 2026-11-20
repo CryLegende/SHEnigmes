@@ -4,7 +4,7 @@
 
 # SHEnigmes
 
-*Codes secrets propres à chaque joueur pour les énigmes : séquences de symboles et mots.*
+*Codes secrets propres à chaque joueur pour les énigmes : séquences de symboles et mots, et collectes de pièces à retrouver.*
 
 <img src="https://img.shields.io/badge/Paper-26.3-f2a900?style=for-the-badge" alt="Paper 26.3"> <img src="https://img.shields.io/badge/Java-25-e76f00?style=for-the-badge" alt="Java 25"> <img src="https://img.shields.io/badge/SkyHand-Opale-3aa655?style=for-the-badge" alt="SkyHand Opale">
 
@@ -14,12 +14,13 @@
 
 ## Présentation
 
-Une énigme est un code secret différent pour chaque joueur, tiré au hasard la première fois qu'on en a besoin. Le plugin ne connaît aucun autre plugin : tout est lancé depuis la console par des commandes, et tout ce qui se passe en retour est une liste de commandes console écrite dans `config.yml` ou un placeholder PlaceholderAPI.
+Une énigme est un code secret différent pour chaque joueur, tiré au hasard la première fois qu'on en a besoin, ou une collecte de pièces à trouver une par une. Le plugin ne connaît aucun autre plugin : tout est lancé depuis la console par des commandes, et tout ce qui se passe en retour est une liste de commandes console écrite dans `config.yml` ou un placeholder PlaceholderAPI.
 
 | Type | Le code | Exemples d'usage |
 |---|---|---|
 | `sequence` | une suite de symboles numérotés, avec ou sans répétition | lanternes à allumer dans l'ordre, mélodie à rejouer |
 | `mot` | un mot dont chaque lettre est une pièce | lettres cachées dans des livres, mot écrit en runes |
+| `collecte` | aucun code, N pièces numérotées à trouver une fois chacune, dans n'importe quel ordre | abeilles perdues cachées dans le monde |
 
 ### Règles
 
@@ -27,7 +28,8 @@ Une énigme est un code secret différent pour chaque joueur, tiré au hasard la
 - **Séquence.** Chaque `saisir` compare l'entrée au code. Une bonne entrée lance `bon`, la dernière lance `reussi`, une mauvaise lance `faux` et remet la saisie à zéro. Sans entrée pendant `oubli-saisie` secondes, la saisie est aussi remise à zéro. Une fois résolue, `saisir` lance `deja`.
 - **Rejeu.** `jouer` joue le code symbole par symbole, un toutes les `intervalle` ticks (`avant` au départ, `apres` un intervalle après le dernier). Un nouveau rejeu de la même énigme remplace celui en cours, et la déconnexion du joueur l'arrête.
 - **Mot.** Le mot est tiré parmi les mots de `mots` dont la longueur vaut `pieces` (les autres sont signalés au chargement). `montrer` révèle une pièce (`%lettre%`) et la marque comme vue. `repondre` compare sans casse, sans accents et sans espaces. Une fois résolu, `repondre` lance `deja`.
-- **Conditions.** Une énigme peut avoir des `conditions` (`%player_name% == Steve`, `%shenigmes_autre_resolue% == true`...), évaluées avec PlaceholderAPI pour le joueur. Si l'une est fausse, `saisir`, `jouer`, `montrer` et `repondre` ne font rien d'autre que lancer `actions.refuse`, et rien n'est tiré ni enregistré. Les placeholders ne tiennent pas compte des conditions.
+- **Collecte.** Pas de code : `pieces` pièces numérotées de 1 à `pieces`, que le plugin ne place nulle part (l'objet cliqué, un modèle 3D par exemple, lance `trouver` depuis la console). Chaque `trouver` d'une pièce nouvelle l'enregistre pour le joueur et lance `trouve` (`%rang%`, `%trouves%`, `%pieces%`, `%restants%`) ; si c'était la dernière, l'énigme est résolue et `reussi` est lancé juste après `trouve`, dans le même bloc de commandes. Une pièce déjà trouvée ne lance que `deja`. Lire un placeholder d'une collecte n'enregistre rien, et changer `pieces` ne fait rien perdre (seuls les rangs de 1 à `pieces` comptent).
+- **Conditions.** Une énigme peut avoir des `conditions` (`%player_name% == Steve`, `%shenigmes_autre_resolue% == true`...), évaluées avec PlaceholderAPI pour le joueur. Si l'une est fausse, `saisir`, `jouer`, `montrer`, `repondre` et `trouver` ne font rien d'autre que lancer `actions.refuse`, et rien n'est tiré ni enregistré. Les placeholders ne tiennent pas compte des conditions.
 - **Aucun texte de joueur dans le code.** Les messages des joueurs sont dans les actions de `config.yml`, ceux de la console dans `messages.yml`. Le texte d'une réponse n'est jamais inséré dans une commande.
 - **Parallélisme.** Les états et les rejeux passent par le scheduler du joueur, et les commandes des actions sont lancées en console sur le thread principal, dans l'ordre (DivineMC fait tourner les mondes en parallèle). Les placeholders lisent une copie en mémoire, sans risque depuis un autre thread.
 
@@ -45,18 +47,19 @@ Alias `/enigmes`. Toutes marchent depuis la console, le joueur doit être connec
 | `/shenigmes jouer <joueur> <id>` | Séquence, rejoue le code au joueur (section `jouer`). | `shenigmes.admin.jouer` |
 | `/shenigmes montrer <joueur> <id> <rang>` | Mot, lance `montrer` avec `%lettre%` et marque la pièce comme vue. | `shenigmes.admin.montrer` |
 | `/shenigmes repondre <joueur> <id> <texte...>` | Mot, compare sans casse, sans accents et sans espaces. Sans texte, c'est une mauvaise réponse. | `shenigmes.admin.repondre` |
-| `/shenigmes reset <joueur> <id\|*>` | Efface le code (un nouveau est tiré au prochain besoin), `*` pour toutes les énigmes. | `shenigmes.admin.reset` |
-| `/shenigmes etat <joueur> [id]` | Code, saisie en cours, pièces vues et état résolu, sans rien tirer. | `shenigmes.admin.etat` |
+| `/shenigmes trouver <joueur> <id> <rang>` | Collecte, le joueur trouve la pièce de ce rang (de 1 à `pieces`) : lance `trouve` puis `reussi` si c'est la dernière, ou `deja` si elle était déjà trouvée. | `shenigmes.admin.trouver` |
+| `/shenigmes reset <joueur> <id\|*>` | Efface le code ou les pièces trouvées (un nouveau code est tiré au prochain besoin, une collecte repart de zéro), `*` pour toutes les énigmes. | `shenigmes.admin.reset` |
+| `/shenigmes etat <joueur> [id]` | Code, saisie en cours, pièces vues ou trouvées et état résolu, sans rien tirer. | `shenigmes.admin.etat` |
 | `/shenigmes reload` | Recharge `config.yml` et `messages.yml` (un fichier illisible ne change rien et est nommé, les codes des joueurs ne sont jamais touchés). | `shenigmes.admin.reload` |
 
-Sans argument, une ligne d'usage ne liste que les sous-commandes permises. Les variables remplacées dans les commandes des actions sont `%player%`, `%id%`, `%symbole%`, `%rang%`, `%longueur%`, `%lettre%` et `%nom%`.
+Sans argument, une ligne d'usage ne liste que les sous-commandes permises. Les variables remplacées dans les commandes des actions sont `%player%`, `%id%`, `%symbole%`, `%rang%`, `%longueur%`, `%lettre%`, `%nom%`, `%trouves%`, `%pieces%` et `%restants%`.
 
 ## Permissions
 
 | Permission | Description | Par défaut |
 |---|---|---|
 | `shenigmes.admin` | Toutes les sous-commandes de `/shenigmes` (parent des nœuds `shenigmes.admin.*`). | `op` |
-| `shenigmes.admin.saisir`, `.jouer`, `.montrer`, `.repondre`, `.reset`, `.etat`, `.reload` | Une par sous-commande du même nom. | `op` |
+| `shenigmes.admin.saisir`, `.jouer`, `.montrer`, `.repondre`, `.trouver`, `.reset`, `.etat`, `.reload` | Une par sous-commande du même nom. | `op` |
 
 ## Placeholders
 
@@ -65,20 +68,23 @@ Sans argument, une ligne d'usage ne liste que les sous-commandes permises. Les v
 | Valeur | Type | Résultat |
 |---|---|---|
 | `resolue` | tous | `true` ou `false` |
-| `code` | tous | `3-1-4-5-2` pour une séquence, le mot pour un mot |
-| `code_<i>` | tous | le symbole ou la lettre de rang `i` |
-| `longueur` | tous | longueur du code |
+| `code` | séquence, mot | `3-1-4-5-2` pour une séquence, le mot pour un mot |
+| `code_<i>` | séquence, mot | le symbole ou la lettre de rang `i` |
+| `longueur` | tous | longueur du code, ou nombre de pièces d'une collecte |
 | `noms` | séquence | les noms des symboles du code, séparés par `separateur` |
 | `nom_<i>` | séquence | le nom du symbole de rang `i` du code |
 | `saisie` | séquence | nombre d'entrées en cours |
 | `vues` | mot | nombre de pièces vues |
 | `vue_<i>` | mot | `true` si la pièce de rang `i` a été vue |
-| `pieces` | mot | nombre de pièces |
+| `pieces` | mot, collecte | nombre de pièces |
 | `lettre_<i>` | mot | la lettre de rang `i` |
+| `trouves` | collecte | nombre de pièces trouvées |
+| `trouve_<i>` | collecte | `true` si la pièce de rang `i` a été trouvée |
+| `restants` | collecte | nombre de pièces qui restent à trouver |
 
 ## Configuration
 
-Fichiers par défaut du plugin, avec des valeurs d'exemple (deux énigmes neutres, des commandes vanilla seulement). Cliquez sur un fichier pour l'ouvrir :
+Fichiers par défaut du plugin, avec des valeurs d'exemple (trois énigmes neutres, des commandes vanilla seulement). Cliquez sur un fichier pour l'ouvrir :
 
 <pre>
 plugins/SHEnigmes/
@@ -105,6 +111,26 @@ enigmes:
         - 'say %player% recommence'
       reussi:
         - 'say %player% a trouvé la séquence'
+```
+
+Une collecte, en résumé (l'objet cliqué lance `/shenigmes trouver <joueur> abeilles <rang>` depuis la console) :
+
+```yaml
+enigmes:
+  abeilles:
+    type: collecte
+    pieces: 5
+    conditions:
+      - '%questcreator_variable_secret_miel% == 1'
+    actions:
+      refuse:
+        - 'tellraw %player% {"text":"Tu ne cherches pas encore les abeilles.","color":"gray"}'
+      trouve:
+        - 'tellraw %player% {"text":"Abeille %trouves% sur %pieces%, il en reste %restants%.","color":"yellow"}'
+      reussi:
+        - 'say %player% a retrouvé toutes les abeilles'
+      deja:
+        - 'tellraw %player% {"text":"Celle-ci est déjà retrouvée.","color":"gray"}'
 ```
 
 ## Compilation
