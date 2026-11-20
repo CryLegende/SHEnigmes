@@ -1,0 +1,49 @@
+##=====================================================================##
+#|                      SHEnigmes - Messages                           |#
+#|                                                                     |#
+#|  Messages de la console et des administrateurs. Les textes des      |#
+#|  joueurs sont dans les actions de config.yml.                       |#
+#|                                                                     |#
+#|  Couleurs : & classiques et &#RRGGBB pour l'hexadécimal.            |#
+#|  Un message vide ("") n'est jamais envoyé.                          |#
+#|                                                                     |#
+#|  Placeholders : {PLAYER} joueur · {ID} identifiant de l'énigme ·    |#
+#|  {ARG} texte reçu · {MAX} valeur maximale · {AMOUNT} nombre ·       |#
+#|  {SOUS-COMMANDES} sous-commandes permises · {FICHIER} {ERREUR} ·    |#
+#|  {CODE} {SAISIE} {VUES} {RESOLUE} état d'un joueur                  |#
+##=====================================================================##
+
+admin:
+  usage: '&7&l« &e&lSH &8&l» &7Tape &e/shenigmes &7<&e{SOUS-COMMANDES}&7>'
+  usage-saisir: '&7&l« &e&lSH &8&l» &7Tape &e/shenigmes saisir &7<&ejoueur&7> <&eénigme&7> <&esymbole&7>'
+  usage-jouer: '&7&l« &e&lSH &8&l» &7Tape &e/shenigmes jouer &7<&ejoueur&7> <&eénigme&7>'
+  usage-montrer: '&7&l« &e&lSH &8&l» &7Tape &e/shenigmes montrer &7<&ejoueur&7> <&eénigme&7> <&erang&7>'
+  usage-repondre: '&7&l« &e&lSH &8&l» &7Tape &e/shenigmes repondre &7<&ejoueur&7> <&eénigme&7> <&etexte&7>'
+  usage-reset: '&7&l« &e&lSH &8&l» &7Tape &e/shenigmes reset &7<&ejoueur&7> <&eénigme&7|&e*&7>'
+  usage-etat: '&7&l« &e&lSH &8&l» &7Tape &e/shenigmes etat &7<&ejoueur&7> [&eénigme&7]'
+  rechargee: '&7&l« &a&lSH &8&l» &7Configuration &arechargée&7, &a{AMOUNT} &7énigme(s) chargée(s).'
+  rechargee-avertissements: '&7&l« &6&lSH &8&l» &6{AMOUNT} &7avertissement(s) à lire dans la console.'
+  erreur-rechargement: '&7&l« &c&lSH &8&l» &7Le fichier &c{FICHIER} &7est illisible, la configuration reste &cinchangée&7. {ERREUR}'
+  aucune-enigme: '&7&l« &e&lSH &8&l» &7Aucune énigme n''est chargée.'
+  reset: '&7&l« &a&lSH &8&l» &7Code de &a{PLAYER} &7effacé pour &a{ID}&7, un nouveau sera tiré.'
+  reset-tout: '&7&l« &a&lSH &8&l» &7Codes de &a{PLAYER} &7effacés, &a{AMOUNT} &7énigme(s).'
+  reset-rien: '&7&l« &e&lSH &8&l» &e{PLAYER} &7n''avait rien d''enregistré pour &e{ID}&7.'
+  etat-entete: '&7&l« &e&lSH &8&l» &7Énigmes de &e{PLAYER}&7.'
+  etat-sequence: '&8&l» &e{ID} &7code &e{CODE}&7, saisie &e{SAISIE}&7, résolue {RESOLUE}&7.'
+  etat-mot: '&8&l» &e{ID} &7mot &e{CODE}&7, pièces vues &e{VUES}&7, résolue {RESOLUE}&7.'
+  etat-vide: '&8&l» &e{ID} &7aucun code tiré pour l''instant.'
+  etat-aucune: aucune
+  etat-oui: '&aoui'
+  etat-non: '&cnon'
+
+erreur:
+  pas-permission: '&7&l« &c&lSH &8&l» &7Tu n''as &cpas la permission &7de faire ça.'
+  joueur-invalide: '&7&l« &c&lSH &8&l» &7Le pseudo &c{ARG} &7n''est &cpas valide&7.'
+  joueur-hors-ligne: '&7&l« &c&lSH &8&l» &c{PLAYER} &7n''est &cpas connecté&7.'
+  enigme-invalide: '&7&l« &c&lSH &8&l» &7L''identifiant &c{ARG} &7n''est &cpas valide&7.'
+  enigme-inconnue: '&7&l« &c&lSH &8&l» &7L''énigme &c{ARG} &7est &cinconnue&7.'
+  pas-une-sequence: '&7&l« &c&lSH &8&l» &7L''énigme &c{ID} &7n''est &cpas une séquence&7.'
+  pas-un-mot: '&7&l« &c&lSH &8&l» &7L''énigme &c{ID} &7n''est &cpas un mot&7.'
+  symbole-invalide: '&7&l« &c&lSH &8&l» &7Le symbole &c{ARG} &7n''est &cpas valide&7, entre 1 et &c{MAX}&7.'
+  rang-invalide: '&7&l« &c&lSH &8&l» &7Le rang &c{ARG} &7n''est &cpas valide&7, entre 1 et &c{MAX}&7.'
+  jouer-absent: '&7&l« &c&lSH &8&l» &7L''énigme &c{ID} &7n''a &cpas de section jouer&7.'

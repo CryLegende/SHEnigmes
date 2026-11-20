@@ -1,0 +1,196 @@
+##=====================================================================##
+#|                            SHEnigmes                                |#
+#|            Codes secrets propres à chaque joueur                    |#
+#|                                                                     |#
+#|  Les messages de la console sont dans messages.yml                  |#
+##=====================================================================##
+#
+# Donne à chaque joueur son propre code secret pour une énigme : une séquence
+# de symboles (lanternes à allumer dans l'ordre, mélodie à rejouer) ou un mot
+# (lettres cachées dans des livres, mot à retrouver). Le plugin ne connaît
+# aucun autre plugin : tout est lancé depuis la console par des commandes, et
+# tout ce qui se passe en retour est une liste de commandes console écrite ici
+# ou un placeholder PlaceholderAPI.
+#
+# Le code est tiré au hasard (SecureRandom) la première fois qu'on en a besoin,
+# puis gardé pour toujours dans les données du joueur (PersistentDataContainer,
+# clé shenigmes:<identifiant>) jusqu'à un /shenigmes reset. Il survit aux
+# redémarrages et aux reconnexions. La saisie en cours, les pièces vues et
+# l'état résolu sont gardés au même endroit.
+#
+# ---------------------------------------------------------------------
+#  COMMANDES  (aussi depuis la console, alias /enigmes)
+# ---------------------------------------------------------------------
+#  /shenigmes saisir <joueur> <id> <symbole>      Séquence : une entrée du joueur
+#  /shenigmes jouer <joueur> <id>                 Séquence : rejoue le code au joueur (section jouer)
+#  /shenigmes montrer <joueur> <id> <rang>        Mot : lance 'montrer' et marque la pièce comme vue
+#  /shenigmes repondre <joueur> <id> <texte...>   Mot : compare sans casse, sans accents, sans espaces
+#  /shenigmes reset <joueur> <id|*>               Efface le code (un nouveau est tiré au prochain besoin)
+#  /shenigmes etat <joueur> [id]                  Code, saisie, pièces vues et résolue (ne tire rien)
+#  /shenigmes reload                              Recharge config.yml et messages.yml (un fichier
+#                                                 illisible ne change rien et est nommé ; aucun réglage
+#                                                 ne demande un redémarrage ; les codes des joueurs
+#                                                 ne sont jamais touchés)
+#  Le joueur doit être connecté. Sans argument ou avec une sous-commande inconnue, une ligne
+#  d'usage ne liste que les sous-commandes permises à l'expéditeur.
+#
+# ---------------------------------------------------------------------
+#  PERMISSIONS
+# ---------------------------------------------------------------------
+#  shenigmes.admin             Toutes les sous-commandes (parent des nœuds ci-dessous)
+#  shenigmes.admin.saisir      saisir
+#  shenigmes.admin.jouer       jouer
+#  shenigmes.admin.montrer     montrer
+#  shenigmes.admin.repondre    repondre
+#  shenigmes.admin.reset       reset
+#  shenigmes.admin.etat        etat
+#  shenigmes.admin.reload      reload
+#
+# ---------------------------------------------------------------------
+#  ÉNIGMES  (section 'enigmes', un bloc par identifiant : a-z 0-9 _ -)
+# ---------------------------------------------------------------------
+#  Commun aux deux types
+#    conditions     Liste de conditions (facultatif), toutes vraies pour que saisir, jouer, montrer et
+#                   repondre agissent. Une condition s'écrit "A opérateur B", avec des espaces autour de
+#                   l'opérateur : == != >= <= > < contient !contient. A et B passent par PlaceholderAPI
+#                   pour le joueur (s'il est installé) avant la comparaison :
+#                     - si A et B se lisent comme des nombres, la comparaison est numérique : espaces et
+#                       apostrophes ignorés, un point ou une virgule seul est la virgule décimale (1,5 vaut
+#                       1.5), avec les deux le dernier est la virgule décimale (1,000.5 et 1.000,5 valent
+#                       1000.5), plusieurs du même signe séparent les milliers (1.000.000)
+#                     - sinon la comparaison porte sur du texte sans codes couleur, sans tenir compte de la
+#                       casse ni des accents, espaces multiples réduits ; >= <= > < y sont toujours faux
+#                     - contient et !contient comparent toujours du texte
+#                   Exemples : '%player_name% == Steve', '%player_level% >= 5',
+#                   '%shenigmes_autre_resolue% == true', '%player_name% !contient bot'.
+#                   Une condition fausse n'enregistre rien (aucun code tiré, aucune saisie, aucune pièce
+#                   vue) et lance seulement actions.refuse. Les placeholders et les sous-commandes reset et
+#                   etat ne tiennent pas compte des conditions. Une condition illisible fait ignorer
+#                   l'énigme, signalée au chargement.
+#
+#  Séquence (type: sequence)
+#    symboles       Nombre d'entrées possibles, de 1 à symboles
+#    longueur       Longueur du code
+#    repetitions    false : le code est une permutation, un symbole n'y est qu'une fois (longueur ne peut
+#                   alors pas dépasser symboles). true : un symbole peut revenir. false par défaut.
+#    noms           Nom de chaque symbole (facultatif), pour %nom% et les placeholders noms et nom_<i>.
+#                   Le numéro sert de nom quand il manque.
+#    separateur     Texte entre deux noms dans le placeholder noms, codes couleur & conservés
+#    oubli-saisie   Secondes sans entrée avant que la saisie en cours soit remise à zéro, 0 pour ne
+#                   jamais l'oublier. 60 par défaut.
+#    actions        Commandes console de chaque événement :
+#                     bon      une bonne entrée, le code n'est pas fini
+#                     faux     une mauvaise entrée, la saisie est remise à zéro
+#                     reussi   la dernière entrée du code, l'énigme est résolue
+#                     deja     une entrée alors que l'énigme est déjà résolue
+#                     refuse   une condition est fausse (valable pour saisir et jouer ; variables %player%
+#                              et %id%)
+#    jouer          Rejeu du code par /shenigmes jouer (facultatif) :
+#                     intervalle   Ticks entre deux symboles (10 par défaut)
+#                     avant        Commandes lancées au tout début, juste avant le premier symbole
+#                     symbole      Commandes de chaque symbole, par numéro
+#                     apres        Commandes lancées un intervalle après le dernier symbole
+#                   Un nouveau rejeu de la même énigme remplace celui qui est en cours ; la
+#                   déconnexion du joueur l'arrête.
+#
+#  Mot (type: mot)
+#    pieces         Nombre de pièces, une lettre par pièce
+#    mots           Mots tirables. Seuls ceux dont la longueur vaut pieces peuvent être tirés, les
+#                   autres sont signalés au chargement. Pas d'espace dans un mot. Un mot que YAML
+#                   lit comme un booléen (OUI, NON, ON, OFF) se met entre guillemets.
+#    actions        Commandes console de chaque événement :
+#                     montrer  /shenigmes montrer : une pièce est révélée (%lettre%)
+#                     reussi   la bonne réponse, l'énigme est résolue
+#                     faux     une mauvaise réponse (un texte vide en est une)
+#                     deja     une réponse alors que l'énigme est déjà résolue
+#                     refuse   une condition est fausse (valable pour montrer et repondre ; variables
+#                              %player% et %id%)
+#
+#  Les commandes d'une action sont lancées en console, sur le thread principal, dans l'ordre. Un
+#  / de tête est accepté. Variables remplacées :
+#    %player%    pseudo du joueur             %id%       identifiant de l'énigme
+#    %symbole%   numéro de l'entrée           %rang%     place de l'entrée dans le code, ou de la pièce
+#    %longueur%  longueur du code ou pieces   %lettre%   lettre de la pièce montrée
+#    %nom%       nom du symbole
+#  Le texte d'une réponse n'est jamais inséré dans une commande.
+#
+# ---------------------------------------------------------------------
+#  PLACEHOLDERS  (PlaceholderAPI, %shenigmes_<id>_...%)
+# ---------------------------------------------------------------------
+#  resolue      true ou false
+#  code         3-1-4-5-2 pour une séquence, le mot pour un mot
+#  code_<i>     le symbole, ou la lettre, de rang i
+#  noms         Les noms des symboles du code, séparés par 'separateur' (séquence)
+#  nom_<i>      Le nom du symbole de rang i du code (séquence)
+#  saisie       Nombre d'entrées en cours (séquence)
+#  vues         Nombre de pièces vues (mot)
+#  vue_<i>      true si la pièce de rang i a été vue (mot)
+#  pieces       Nombre de pièces (mot)
+#  lettre_<i>   La lettre de rang i (mot)
+#  longueur     Longueur du code
+#  Lire un placeholder tire le code du joueur s'il n'existe pas encore. Un identifiant inconnu, une
+#  valeur qui ne s'applique pas au type de l'énigme ou un joueur hors ligne donnent un texte vide.
+# ---------------------------------------------------------------------
+
+enigmes:
+  # Quatre symboles à entrer dans l'ordre, un son différent pour chacun.
+  sequence-exemple:
+    type: sequence
+    symboles: 4
+    longueur: 4
+    repetitions: false
+    noms:
+      1: Rouge
+      2: Bleu
+      3: Vert
+      4: Jaune
+    separateur: ' &8→ &f'
+    oubli-saisie: 60
+    actions:
+      bon:
+        - 'execute at %player% run playsound minecraft:block.note_block.bell master %player% ~ ~ ~ 1 1.5'
+        - 'tellraw %player% {"text":"Bien, étape %rang% sur %longueur%.","color":"green"}'
+      faux:
+        - 'execute at %player% run playsound minecraft:block.note_block.bass master %player% ~ ~ ~ 1 0.6'
+        - 'tellraw %player% {"text":"Ce n''était pas le bon ordre, on reprend depuis le début.","color":"red"}'
+      reussi:
+        - 'execute at %player% run playsound minecraft:entity.player.levelup master %player% ~ ~ ~ 1 1'
+        - 'say %player% a trouvé la séquence %id%'
+      deja:
+        - 'tellraw %player% {"text":"Cette séquence est déjà résolue.","color":"gray"}'
+    jouer:
+      intervalle: 10
+      avant:
+        - 'tellraw %player% {"text":"Écoute bien.","color":"gray"}'
+      symbole:
+        1:
+          - 'execute at %player% run playsound minecraft:block.note_block.harp master %player% ~ ~ ~ 1 0.8'
+        2:
+          - 'execute at %player% run playsound minecraft:block.note_block.harp master %player% ~ ~ ~ 1 1'
+        3:
+          - 'execute at %player% run playsound minecraft:block.note_block.harp master %player% ~ ~ ~ 1 1.2'
+        4:
+          - 'execute at %player% run playsound minecraft:block.note_block.harp master %player% ~ ~ ~ 1 1.5'
+      apres:
+        - 'tellraw %player% {"text":"À toi.","color":"gray"}'
+
+  # Un mot de cinq lettres par joueur, une lettre par pièce.
+  mot-exemple:
+    type: mot
+    pieces: 5
+    mots:
+      - ARBRE
+      - PIANO
+      - TIGRE
+      - NUAGE
+      - LIVRE
+    actions:
+      montrer:
+        - 'tellraw %player% {"text":"La lettre %rang% du mot est %lettre%.","color":"yellow"}'
+      reussi:
+        - 'execute at %player% run playsound minecraft:entity.player.levelup master %player% ~ ~ ~ 1 1'
+        - 'say %player% a trouvé le mot de %id%'
+      faux:
+        - 'tellraw %player% {"text":"Ce n''est pas le bon mot.","color":"red"}'
+      deja:
+        - 'tellraw %player% {"text":"Tu as déjà trouvé ce mot.","color":"gray"}'
