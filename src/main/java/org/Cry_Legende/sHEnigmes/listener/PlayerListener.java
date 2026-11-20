@@ -22,6 +22,7 @@ public final class PlayerListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         plugin.playbacks().cancelAll(event.getPlayer().getUniqueId());
+        plugin.presences().forget(event.getPlayer().getUniqueId());
         plugin.store().quit(event.getPlayer());
     }
 }

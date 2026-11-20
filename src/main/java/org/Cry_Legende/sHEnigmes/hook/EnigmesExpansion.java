@@ -4,6 +4,7 @@ import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.Cry_Legende.sHEnigmes.SHEnigmes;
 import org.Cry_Legende.sHEnigmes.data.PuzzleState;
 import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
+import org.Cry_Legende.sHEnigmes.puzzle.PresencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.SequencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.WordPuzzle;
@@ -85,6 +86,9 @@ public final class EnigmesExpansion extends PlaceholderExpansion {
         if (what.equals("longueur")) {
             return String.valueOf(puzzle.length());
         }
+        if (what.equals("duree")) {
+            return puzzle instanceof PresencePuzzle presence ? String.valueOf(presence.seconds()) : "";
+        }
         if (what.equals("pieces")) {
             return switch (puzzle) {
                 case WordPuzzle word -> String.valueOf(word.pieces());
@@ -96,6 +100,14 @@ public final class EnigmesExpansion extends PlaceholderExpansion {
         Player player = offline == null ? null : offline.getPlayer();
         if (player == null) {
             return "";
+        }
+        if (puzzle instanceof PresencePuzzle) {
+            // rien d'enregistré : seule la tenue en cours se lit
+            return switch (what) {
+                case "secondes" -> String.valueOf(plugin.presences().seconds(player.getUniqueId(), puzzle.id()));
+                case "restants" -> String.valueOf(puzzle.length() - plugin.presences().seconds(player.getUniqueId(), puzzle.id()));
+                default -> "";
+            };
         }
         SequencePuzzle sequence = puzzle instanceof SequencePuzzle s ? s : null;
         WordPuzzle word = puzzle instanceof WordPuzzle w ? w : null;

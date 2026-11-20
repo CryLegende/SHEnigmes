@@ -9,6 +9,7 @@ import org.Cry_Legende.sHEnigmes.data.PuzzleState;
 import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Condition;
 import org.Cry_Legende.sHEnigmes.puzzle.Event;
+import org.Cry_Legende.sHEnigmes.puzzle.PresencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.SequencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.WordPuzzle;
@@ -385,6 +386,9 @@ public final class PuzzleEngine {
             } else {
                 playbacks.cancel(player.getUniqueId(), id);
             }
+            if (all) {
+                plugin.presences().forget(player.getUniqueId());
+            }
             List<String> cleared = store.reset(player, id);
             if (all) {
                 messages().send(sender, "admin.reset-tout", "{PLAYER}", player.getName(),
@@ -424,6 +428,12 @@ public final class PuzzleEngine {
         onPlayer(sender, player, () -> {
             messages().send(sender, "admin.etat-entete", "{PLAYER}", player.getName());
             for (Puzzle puzzle : selected) {
+                if (puzzle instanceof PresencePuzzle presence) {
+                    messages().send(sender, "admin.etat-presence", "{ID}", puzzle.id(),
+                        "{AMOUNT}", String.valueOf(plugin.presences().seconds(player.getUniqueId(), puzzle.id())),
+                        "{MAX}", String.valueOf(presence.seconds()));
+                    continue;
+                }
                 PuzzleState state = store.peek(player, puzzle);
                 if (puzzle instanceof CollectionPuzzle collection) {
                     // pas de code à tirer : une collecte jamais commencée s'affiche à zéro

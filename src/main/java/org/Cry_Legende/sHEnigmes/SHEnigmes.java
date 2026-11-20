@@ -6,6 +6,7 @@ import org.Cry_Legende.sHEnigmes.config.PluginConfig;
 import org.Cry_Legende.sHEnigmes.data.PlayerStore;
 import org.Cry_Legende.sHEnigmes.engine.ActionRunner;
 import org.Cry_Legende.sHEnigmes.engine.PlaybackManager;
+import org.Cry_Legende.sHEnigmes.engine.PresenceTracker;
 import org.Cry_Legende.sHEnigmes.engine.PuzzleEngine;
 import org.Cry_Legende.sHEnigmes.hook.PapiHook;
 import org.Cry_Legende.sHEnigmes.listener.PlayerListener;
@@ -26,6 +27,7 @@ public final class SHEnigmes extends JavaPlugin {
     private PlayerStore store;
     private PlaybackManager playbacks;
     private PuzzleEngine engine;
+    private PresenceTracker presences;
     private volatile PapiHook papi;
 
     @Override
@@ -39,6 +41,8 @@ public final class SHEnigmes extends JavaPlugin {
         ActionRunner actions = new ActionRunner(this);
         playbacks = new PlaybackManager(this, actions);
         engine = new PuzzleEngine(this, store, actions, playbacks);
+        presences = new PresenceTracker(this, actions);
+        presences.start();
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
 
         PluginCommand command = getCommand("shenigmes");
@@ -74,6 +78,9 @@ public final class SHEnigmes extends JavaPlugin {
         if (playbacks != null) {
             playbacks.cancelEverything();
         }
+        if (presences != null) {
+            presences.stop();
+        }
         if (store != null) {
             store.saveAll();
         }
@@ -97,6 +104,7 @@ public final class SHEnigmes extends JavaPlugin {
         }
         messages.load();
         config = PluginConfig.load(this);
+        presences.clear();
         messages.send(sender, "admin.rechargee", "{AMOUNT}", String.valueOf(config.puzzles().size()));
         if (!config.warnings().isEmpty()) {
             messages.send(sender, "admin.rechargee-avertissements", "{AMOUNT}", String.valueOf(config.warnings().size()));
@@ -129,5 +137,9 @@ public final class SHEnigmes extends JavaPlugin {
 
     public PuzzleEngine engine() {
         return engine;
+    }
+
+    public PresenceTracker presences() {
+        return presences;
     }
 }

@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
+import org.Cry_Legende.sHEnigmes.puzzle.PresencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.SequencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.WordPuzzle;
@@ -64,6 +65,10 @@ public final class PuzzleState {
                 // un changement de pieces ne fait rien perdre : seuls les rangs de 1 à pieces comptent
                 return collection;
             }
+            case PresencePuzzle ignored -> {
+                // rien n'est enregistré pour une présence
+                return true;
+            }
         }
     }
 
@@ -112,6 +117,8 @@ public final class PuzzleState {
             }
             case WordPuzzle wordPuzzle -> word = wordPuzzle.words().get(random.nextInt(wordPuzzle.words().size()));
             case CollectionPuzzle ignored -> collection = true;
+            case PresencePuzzle ignored -> {
+            }
         }
     }
 

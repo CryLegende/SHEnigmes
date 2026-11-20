@@ -4,7 +4,7 @@
 
 # SHEnigmes
 
-*Codes secrets propres à chaque joueur pour les énigmes : séquences de symboles et mots, et collectes de pièces à retrouver.*
+*Codes secrets propres à chaque joueur pour les énigmes : séquences de symboles et mots, collectes de pièces à retrouver et présences à tenir dans une zone.*
 
 <img src="https://img.shields.io/badge/Paper-26.3-f2a900?style=for-the-badge" alt="Paper 26.3"> <img src="https://img.shields.io/badge/Java-25-e76f00?style=for-the-badge" alt="Java 25"> <img src="https://img.shields.io/badge/SkyHand-Opale-3aa655?style=for-the-badge" alt="SkyHand Opale">
 
@@ -21,6 +21,7 @@ Une énigme est un code secret différent pour chaque joueur, tiré au hasard la
 | `sequence` | une suite de symboles numérotés, avec ou sans répétition | lanternes à allumer dans l'ordre, mélodie à rejouer |
 | `mot` | un mot dont chaque lettre est une pièce | lettres cachées dans des livres, mot écrit en runes |
 | `collecte` | aucun code, N pièces numérotées à trouver une fois chacune, dans n'importe quel ordre | abeilles perdues cachées dans le monde |
+| `presence` | aucun code, rester N secondes d'affilée dans une zone en remplissant une condition de tenue | méditer assis ou accroupi au pied d'un arbre |
 
 ### Règles
 
@@ -29,6 +30,7 @@ Une énigme est un code secret différent pour chaque joueur, tiré au hasard la
 - **Rejeu.** `jouer` joue le code symbole par symbole, un toutes les `intervalle` ticks (`avant` au départ, `apres` un intervalle après le dernier). Un nouveau rejeu de la même énigme remplace celui en cours, et la déconnexion du joueur l'arrête.
 - **Mot.** Le mot est tiré parmi les mots de `mots` dont la longueur vaut `pieces` (les autres sont signalés au chargement). `montrer` révèle une pièce (`%lettre%`) et la marque comme vue. `repondre` compare sans casse, sans accents et sans espaces. Une fois résolu, `repondre` lance `deja`.
 - **Collecte.** Pas de code : `pieces` pièces numérotées de 1 à `pieces`, que le plugin ne place nulle part (l'objet cliqué, un modèle 3D par exemple, lance `trouver` depuis la console). Chaque `trouver` d'une pièce nouvelle l'enregistre pour le joueur et lance `trouve` (`%rang%`, `%trouves%`, `%pieces%`, `%restants%`) ; si c'était la dernière, l'énigme est résolue et `reussi` est lancé juste après `trouve`, dans le même bloc de commandes. Une pièce déjà trouvée ne lance que `deja`. Lire un placeholder d'une collecte n'enregistre rien, et changer `pieces` ne fait rien perdre (seuls les rangs de 1 à `pieces` comptent).
+- **Présence.** Pas de code : une sphère (`zone` : monde, x, y, z, rayon) et une `duree` en secondes. Une fois par seconde, chaque joueur du monde de la zone qui s'y tient, remplit les `conditions` et au moins une condition de `tenir` (par exemple `%shsit_assis% == true` ou `%player_is_sneaking% == yes`) avance d'une seconde et lance `progres` (`%secondes%`, `%duree%`, `%restants%`) ; à la dernière, `reussi`. Dès qu'il cesse (sorti, condition fausse, plus aucune tenue), il repart de zéro et `interrompu` est lancé. Rien n'est enregistré : une déconnexion, un `reload` ou un redémarrage fait repartir de zéro. Les placeholders ne sont lus que pour les joueurs dans la zone.
 - **Conditions.** Une énigme peut avoir des `conditions` (`%player_name% == Steve`, `%shenigmes_autre_resolue% == true`...), évaluées avec PlaceholderAPI pour le joueur. Si l'une est fausse, `saisir`, `jouer`, `montrer`, `repondre` et `trouver` ne font rien d'autre que lancer `actions.refuse`, et rien n'est tiré ni enregistré. Les placeholders ne tiennent pas compte des conditions.
 - **Aucun texte de joueur dans le code.** Les messages des joueurs sont dans les actions de `config.yml`, ceux de la console dans `messages.yml`. Le texte d'une réponse n'est jamais inséré dans une commande.
 - **Parallélisme.** Les états et les rejeux passent par le scheduler du joueur, et les commandes des actions sont lancées en console sur le thread principal, dans l'ordre (DivineMC fait tourner les mondes en parallèle). Les placeholders lisent une copie en mémoire, sans risque depuis un autre thread.
@@ -70,7 +72,7 @@ Sans argument, une ligne d'usage ne liste que les sous-commandes permises. Les v
 | `resolue` | tous | `true` ou `false` |
 | `code` | séquence, mot | `3-1-4-5-2` pour une séquence, le mot pour un mot |
 | `code_<i>` | séquence, mot | le symbole ou la lettre de rang `i` |
-| `longueur` | tous | longueur du code, ou nombre de pièces d'une collecte |
+| `longueur` | tous | longueur du code, nombre de pièces d'une collecte, ou secondes à tenir d'une présence |
 | `noms` | séquence | les noms des symboles du code, séparés par `separateur` |
 | `nom_<i>` | séquence | le nom du symbole de rang `i` du code |
 | `saisie` | séquence | nombre d'entrées en cours |
@@ -80,7 +82,9 @@ Sans argument, une ligne d'usage ne liste que les sous-commandes permises. Les v
 | `lettre_<i>` | mot | la lettre de rang `i` |
 | `trouves` | collecte | nombre de pièces trouvées |
 | `trouve_<i>` | collecte | `true` si la pièce de rang `i` a été trouvée |
-| `restants` | collecte | nombre de pièces qui restent à trouver |
+| `restants` | collecte, présence | nombre de pièces qui restent à trouver, ou de secondes qui restent à tenir |
+| `secondes` | présence | secondes tenues d'affilée en ce moment |
+| `duree` | présence | secondes à tenir |
 
 ## Configuration
 
@@ -131,6 +135,26 @@ enigmes:
         - 'say %player% a retrouvé toutes les abeilles'
       deja:
         - 'tellraw %player% {"text":"Celle-ci est déjà retrouvée.","color":"gray"}'
+```
+
+Une présence, en résumé (une minute assis avec SHSit, ou accroupi, au pied d'un arbre) :
+
+```yaml
+enigmes:
+  mediter:
+    type: presence
+    zone: {monde: spawn, x: -74.5, y: 45.5, z: -29.5, rayon: 3.5}
+    duree: 60
+    tenir:
+      - '%shsit_assis% == true'
+      - '%player_is_sneaking% == yes'
+    actions:
+      progres:
+        - 'title %player% actionbar {"text":"Méditation %secondes%/%duree% s"}'
+      interrompu:
+        - 'title %player% actionbar {"text":"Tu t\'es relevé : on recommence."}'
+      reussi:
+        - 'say %player% a médité une minute'
 ```
 
 ## Compilation

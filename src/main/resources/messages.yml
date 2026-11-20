@@ -35,6 +35,7 @@ admin:
   etat-mot: '&8&l» &e{ID} &7mot &e{CODE}&7, pièces vues &e{VUES}&7, résolue {RESOLUE}&7.'
   etat-collecte: '&8&l» &e{ID} &7pièces trouvées &e{TROUVEES} &7({AMOUNT} sur {MAX}), résolue {RESOLUE}&7.'
   etat-vide: '&8&l» &e{ID} &7aucun code tiré pour l''instant.'
+  etat-presence: '&8&l» &e{ID} &7présence tenue &e{AMOUNT} &7s sur {MAX} (rien n''est enregistré).'
   etat-aucune: aucune
   etat-oui: '&aoui'
   etat-non: '&cnon'

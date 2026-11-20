@@ -4,6 +4,7 @@ import org.Cry_Legende.sHEnigmes.SHEnigmes;
 import org.Cry_Legende.sHEnigmes.puzzle.CollectionPuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Condition;
 import org.Cry_Legende.sHEnigmes.puzzle.Event;
+import org.Cry_Legende.sHEnigmes.puzzle.PresencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.Puzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.SequencePuzzle;
 import org.Cry_Legende.sHEnigmes.puzzle.WordPuzzle;
@@ -34,6 +35,9 @@ public final class PluginConfig {
     private static final int MAX_LENGTH = 64;
     private static final int DEFAULT_FORGET_SECONDS = 60;
     private static final int DEFAULT_INTERVAL = 10;
+    private static final double DEFAULT_RADIUS = 3;
+    private static final double MAX_RADIUS = 64;
+    private static final int MAX_SECONDS = 3600;
 
     private final Map<String, Puzzle> puzzles;
     private final List<String> warnings;
@@ -90,8 +94,9 @@ public final class PluginConfig {
             case "sequence" -> readSequence(id, section, conditions, warnings, prefix);
             case "mot" -> readWord(id, section, conditions, warnings, prefix);
             case "collecte" -> readCollection(id, section, conditions, warnings, prefix);
+            case "presence" -> readPresence(id, section, conditions, warnings, prefix);
             default -> {
-                warnings.add(prefix + "'type' vaut '" + section.getString("type") + "' (sequence, mot ou collecte)");
+                warnings.add(prefix + "'type' vaut '" + section.getString("type") + "' (sequence, mot, collecte ou presence)");
                 yield null;
             }
         };
@@ -229,6 +234,34 @@ public final class PluginConfig {
         return new CollectionPuzzle(id, pieces, conditions, readActions(id, section, Event.COLLECTION, warnings));
     }
 
+    // ------------------------------------------------------------------ présence
+
+    private static Puzzle readPresence(String id, ConfigurationSection section, List<Condition> conditions,
+                                       List<String> warnings, String prefix) {
+        ConfigurationSection zone = section.getConfigurationSection("zone");
+        if (zone == null || zone.getString("monde", "").isBlank()
+            || !zone.isSet("x") || !zone.isSet("y") || !zone.isSet("z")) {
+            warnings.add(prefix + "'zone' doit donner monde, x, y et z");
+            return null;
+        }
+        double radius = zone.getDouble("rayon", DEFAULT_RADIUS);
+        if (radius <= 0 || radius > MAX_RADIUS) {
+            warnings.add(prefix + "'zone.rayon' doit être entre 0 (exclu) et " + (int) MAX_RADIUS + " blocs");
+            return null;
+        }
+        int seconds = section.getInt("duree");
+        if (seconds < 1 || seconds > MAX_SECONDS) {
+            warnings.add(prefix + "'duree' doit être un entier entre 1 et " + MAX_SECONDS + " secondes");
+            return null;
+        }
+        List<Condition> hold = readConditions(id, section, "tenir", warnings);
+        if (hold == null) {
+            return null;
+        }
+        return new PresencePuzzle(id, zone.getString("monde").strip(), zone.getDouble("x"), zone.getDouble("y"),
+            zone.getDouble("z"), radius, seconds, hold, conditions, readActions(id, section, Event.PRESENCE, warnings));
+    }
+
     // ------------------------------------------------------------------ communs
 
     /**
@@ -238,8 +271,18 @@ public final class PluginConfig {
      * @return null si une condition est illisible
      */
     private static List<Condition> readConditions(String id, ConfigurationSection section, List<String> warnings) {
-        List<String> lines = section.isString("conditions")
-            ? List.of(section.getString("conditions", "")) : section.getStringList("conditions");
+        return readConditions(id, section, "conditions", warnings);
+    }
+
+    /**
+     * Une liste de conditions sous cette clé (une chaîne seule compte pour une liste d'un élément).
+     *
+     * @return null si une condition est illisible
+     */
+    private static List<Condition> readConditions(String id, ConfigurationSection section, String key,
+                                                  List<String> warnings) {
+        List<String> lines = section.isString(key)
+            ? List.of(section.getString(key, "")) : section.getStringList(key);
         List<Condition> conditions = new ArrayList<>(lines.size());
         for (String line : lines) {
             if (line == null || line.isBlank()) {
@@ -247,7 +290,7 @@ public final class PluginConfig {
             }
             Condition condition = Condition.parse(line);
             if (condition == null) {
-                warnings.add("Énigme '" + id + "' ignorée : condition illisible '" + line
+                warnings.add("Énigme '" + id + "' ignorée : condition de '" + key + "' illisible '" + line
                     + "' (A opérateur B, avec == != >= <= > < contient !contient entourés d'espaces)");
                 return null;
             }

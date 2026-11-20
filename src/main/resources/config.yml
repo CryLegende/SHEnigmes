@@ -9,7 +9,9 @@
 # de symboles (lanternes à allumer dans l'ordre, mélodie à rejouer) ou un mot
 # (lettres cachées dans des livres, mot à retrouver). Une collecte n'a pas de
 # code : ce sont des pièces numérotées à trouver, une fois chacune (abeilles
-# perdues cachées dans le monde). Le plugin ne connaît aucun autre plugin :
+# perdues cachées dans le monde). Une présence n'a pas de code non plus : il faut
+# rester un temps dans une zone, par exemple assis ou accroupi (méditer sous un
+# arbre). Le plugin ne connaît aucun autre plugin :
 # tout est lancé depuis la console par des commandes, et tout ce qui se passe
 # en retour est une liste de commandes console écrite ici ou un placeholder
 # PlaceholderAPI.
@@ -55,9 +57,9 @@
 # ---------------------------------------------------------------------
 #  ÉNIGMES  (section 'enigmes', un bloc par identifiant : a-z 0-9 _ -)
 # ---------------------------------------------------------------------
-#  Commun aux trois types
+#  Commun aux quatre types
 #    conditions     Liste de conditions (facultatif), toutes vraies pour que saisir, jouer, montrer,
-#                   repondre et trouver agissent. Une condition s'écrit "A opérateur B", avec des espaces autour de
+#                   repondre et trouver agissent (présence : pour que les secondes comptent). Une condition s'écrit "A opérateur B", avec des espaces autour de
 #                   l'opérateur : == != >= <= > < contient !contient. A et B passent par PlaceholderAPI
 #                   pour le joueur (s'il est installé) avant la comparaison :
 #                     - si A et B se lisent comme des nombres, la comparaison est numérique : espaces et
@@ -125,13 +127,31 @@
 #                   n'enregistre rien. Changer pieces ne fait rien perdre (seuls les rangs de 1 à pieces
 #                   comptent).
 #
+#  Présence (type: presence)
+#    zone           Sphère où se tenir : monde, x, y, z (centre) et rayon en blocs (3 par défaut, 64 au plus)
+#    duree          Secondes à tenir d'affilée (1 à 3600)
+#    tenir          Conditions de tenue (même écriture que conditions), au moins UNE vraie chaque seconde ;
+#                   liste vide ou absente : rester dans la zone suffit. Exemple, assis (SHSit) ou accroupi :
+#                     - '%shsit_pose% == sit'
+#                     - '%player_is_sneaking% == yes'
+#    actions        Commandes console de chaque événement :
+#                     progres     chaque seconde tenue, sauf la dernière (%secondes% %duree% %restants%)
+#                     interrompu  le joueur a cessé de tenir (sorti de la zone, une condition fausse, plus
+#                                 aucune tenue) : il repart de zéro (%secondes% = secondes perdues)
+#                     reussi      la dernière seconde : la tenue repart de zéro, à relancer si les
+#                                 conditions restent vraies (faites-les changer, par exemple l'étape d'une quête)
+#                   Vérifié une fois par seconde, seulement pour les joueurs du monde de la zone. Rien n'est
+#                   enregistré : une déconnexion, un /shenigmes reload ou un redémarrage fait repartir de zéro.
+#
 #  Les commandes d'une action sont lancées en console, sur le thread principal, dans l'ordre. Un
 #  / de tête est accepté. Variables remplacées :
 #    %player%    pseudo du joueur             %id%       identifiant de l'énigme
 #    %symbole%   numéro de l'entrée           %rang%     place de l'entrée dans le code, ou de la pièce
 #    %longueur%  longueur du code ou pieces   %lettre%   lettre de la pièce montrée
 #    %nom%       nom du symbole               %trouves%  pièces trouvées (collecte), celle-ci comprise
-#    %pieces%    nombre de pièces (collecte)  %restants% pièces qui restent à trouver (collecte)
+#    %pieces%    nombre de pièces (collecte)  %restants% pièces qui restent à trouver (collecte), ou
+#                                             secondes qui restent à tenir (présence)
+#    %secondes%  secondes tenues (présence)   %duree%    secondes à tenir (présence)
 #  Le texte d'une réponse n'est jamais inséré dans une commande.
 #
 # ---------------------------------------------------------------------
@@ -149,8 +169,10 @@
 #  lettre_<i>   La lettre de rang i (mot)
 #  trouves      Nombre de pièces trouvées (collecte)
 #  trouve_<i>   true si la pièce de rang i a été trouvée (collecte)
-#  restants     Nombre de pièces qui restent à trouver (collecte)
-#  longueur     Longueur du code, ou nombre de pièces
+#  restants     Nombre de pièces qui restent à trouver (collecte), ou secondes qui restent à tenir (présence)
+#  secondes     Secondes tenues d'affilée en ce moment (présence)
+#  duree        Secondes à tenir (présence)
+#  longueur     Longueur du code, nombre de pièces, ou secondes à tenir (présence)
 #  Lire un placeholder tire le code du joueur s'il n'existe pas encore (une collecte n'a pas de code, la
 #  lire n'enregistre rien). Un identifiant inconnu, une
 #  valeur qui ne s'applique pas au type de l'énigme ou un joueur hors ligne donnent un texte vide.
